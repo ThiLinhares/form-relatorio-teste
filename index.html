@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Relatório de Teste Editável: Remoção Botão Cadastrar Usuário</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutral Harmony -->
+    <!-- Application Structure Plan: A single-column, top-to-bottom hierarchical structure with editable fields (including dropdowns for status/priority in a 2x4 table), interactive evidence upload/linking with removal option, dynamic list item management (+/- buttons with auto-numbering), and PDF export with CamelCase filename. PDF button disabled during edit mode. Status visualization is a dynamic bar. An "Edit/Save" toggle controls content state for text fields. Dropdowns and evidence sections update visuals dynamically. PDF text alignment and background contrast fine-tuned. -->
+    <!-- Visualization & Content Choices: Editable Text Fields & Selects -> Goal: Customization -> Method: HTML input/textarea/select + JS -> Interaction: User input/selection. | Dynamic Lists (+/-) -> Goal: Flexible list content -> Method: JS DOM manipulation with auto-numbering -> Interaction: Button clicks. | Status Bar -> Goal: Visualize Status -> Method: Styled Div (dynamically updated text & color) -> Interaction: None (updates based on select). | Evidence Upload/Link -> Goal: Attach Supporting Material -> Method: File input for images, Text input for video links (displays link as text) with JS preview and removal -> Interaction: Button clicks, file selection, text input. | PDF Export -> Goal: Portability -> Method: html2canvas + jsPDF -> Interaction: Button click. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f7f4; 
+        }
+        .editable-input, .editable-textarea, .editable-select {
+            border: 1px solid #e2e8f0; 
+            padding: 0.5rem;
+            border-radius: 0.375rem; 
+            width: 100%;
+            background-color: #f9fafb; 
+        }
+        .editable-textarea {
+            min-height: 80px;
+        }
+        .editable-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+            background-position: right 0.5rem center;
+            background-repeat: no-repeat;
+            background-size: 1.5em 1.5em;
+            padding-right: 2.5rem;
+        }
+        #screenshotPreview {
+            max-height: 400px; 
+            object-fit: contain;
+            display: block; 
+        }
+        #videoPreviewContainer { 
+            padding: 1rem;
+            text-align: center;
+            min-height: 50px; 
+        }
+        .list-item-controls button, .evidence-remove-btn {
+            background-color: #e2e8f0; 
+            color: #475569; 
+            border-radius: 9999px; 
+            width: 1.75rem; 
+            height: 1.75rem; 
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 0.5rem; 
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        .list-item-controls button:hover, .evidence-remove-btn:hover {
+            background-color: #cbd5e1; 
+        }
+        .list-item-controls button.remove-item-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .list-item-number {
+            margin-right: 0.5rem; 
+            font-weight: 500; 
+            color: #64748b; 
+        }
+        #statusDisplayBar {
+            transition: background-color 0.3s ease-in-out;
+        }
+        .info-table th {
+            text-align: left;
+            padding: 0.5rem 1rem;
+            background-color: #f9fafb; 
+            color: #4b5563; 
+            font-weight: 600;
+        }
+        .info-table td {
+            padding: 0.75rem 1rem; 
+            vertical-align: top; 
+        }
+        .info-table .editable-select {
+            min-width: 150px; 
+        }
+        .info-table .value-display-span { 
+             display: inline-block; 
+        }
+        .evidence-item-container {
+            position: relative;
+        }
+        .evidence-remove-btn {
+            position: absolute;
+            top: -0.5rem;
+            right: -0.5rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            font-size: 0.75rem;
+            line-height: 1rem;
+            z-index: 10;
+        }
+        #savePdfButton:disabled {
+            background-color: #9ca3af; /* gray-400 */
+            cursor: not-allowed;
+        }
+
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            #toggleEditButton, #savePdfButton, #screenshotButton, #videoButton, #imageUploadInput, #videoLinkInput, .list-item-controls, .evidence-remove-btn {
+                display: none !important;
+            }
+            .bg-white { 
+                background-color: white !important;
+            }
+        }
+    </style>
+</head>
+<body class="text-slate-700">
+
+    <div class="container mx-auto p-4 md:p-8" id="reportContainer">
+        
+        <header class="mb-8">
+            <div class="editable-container">
+                <h1 data-editable-id="main-title" class="text-3xl md:text-4xl font-bold text-slate-800 editable-text">Verificar a remoção do botão "Cadastrar novo usuário" na tela de gerenciamento de "Usuários"</h1>
+                <input type="text" id="input-main-title" class="editable-input hidden text-3xl md:text-4xl font-bold text-slate-800">
+            </div>
+        </header>
+
+        <div class="mb-6 flex flex-wrap gap-4 justify-end">
+            <button id="toggleEditButton" class="bg-sky-600 hover:bg-sky-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors">
+                Editar Dados
+            </button>
+            <button id="savePdfButton" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors">
+                Salvar como PDF
+            </button>
+        </div>
+
+        <main class="space-y-8">
+            <section class="bg-white rounded-xl shadow-md p-6">
+                <table class="w-full info-table text-sm" id="infoTable">
+                    <thead>
+                        <tr class="border-b border-slate-200">
+                            <th class="px-4 py-2 text-left font-semibold text-slate-600">ID DO TESTE</th>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-600">STATUS</th>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-600">MÓDULO</th>
+                            <th class="px-4 py-2 text-left font-semibold text-slate-600">PRIORIDADE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-t border-slate-200">
+                            <td class="px-4 py-3 editable-container">
+                                <span data-editable-id="test-id" class="font-mono text-slate-900 editable-text">CT_ADM_USR_001</span>
+                                <input type="text" id="input-test-id" class="editable-input hidden font-mono">
+                            </td>
+                            <td class="px-4 py-3">
+                                 <span id="displayTestStatusSpan" data-value-id="status" class="value-display-span text-sm font-semibold px-3 py-1 rounded-full"></span>
+                                 <select id="select-test-status" class="editable-select font-bold text-base w-full hidden">
+                                    <option value="APROVADO">Aprovado</option>
+                                    <option value="REPROVADO">Reprovado</option>
+                                    <option value="BLOQUEADO">Bloqueado</option>
+                                </select>
+                            </td>
+                            <td class="px-4 py-3 editable-container">
+                                <span data-editable-id="test-module" class="text-slate-900 editable-text">Admin > Usuários</span>
+                                <input type="text" id="input-test-module" class="editable-input hidden">
+                            </td>
+                            <td class="px-4 py-3">
+                                <span id="displayTestPrioritySpan" data-value-id="priority" class="value-display-span text-sm font-semibold px-3 py-1 rounded-full"></span>
+                                <select id="select-test-priority" class="editable-select w-full hidden">
+                                    <option value="Baixa">Baixa</option>
+                                    <option value="Normal" selected>Normal</option>
+                                    <option value="Alta">Alta</option>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-md p-6">
+                <div class="intro-section mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">Detalhes da Execução</h2>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="editable-container">
+                        <h3 class="font-bold text-lg text-slate-800 mb-2">🎯 Objetivo do Teste</h3>
+                        <p data-editable-id="test-objective" class="editable-text">Assegurar que o botão "Cadastrar novo usuário" não esteja mais visível na tela de "Usuários", conforme a nova diretriz de que o cadastro será realizado exclusivamente pela tela inicial do sistema.</p>
+                        <textarea id="input-test-objective" class="editable-textarea hidden"></textarea>
+                    </div>
+
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800 mb-2">⚙️ Ambiente de Teste</h3>
+                        <ul class="list-disc list-inside text-slate-600 space-y-1">
+                            <li class="editable-container"><span class="font-semibold">Ambiente:</span> <span data-editable-id="env-item-1" class="editable-text">Homologação</span><input type="text" id="input-env-item-1" class="editable-input hidden inline w-auto ml-1"></li>
+                            <li class="editable-container"><span class="font-semibold">Versão do Sistema:</span> <span data-editable-id="env-item-2" class="editable-text">1.2.5</span><input type="text" id="input-env-item-2" class="editable-input hidden inline w-auto ml-1"></li>
+                            <li class="editable-container"><span class="font-semibold">Navegador:</span> <span data-editable-id="env-item-3" class="editable-text">Google Chrome 125.0.6422.142</span><input type="text" id="input-env-item-3" class="editable-input hidden inline w-auto ml-1"></li>
+                            <li class="editable-container"><span class="font-semibold">Usuário de Teste:</span> <span data-editable-id="env-item-4" class="font-mono editable-text">admin_teste</span><input type="text" id="input-env-item-4" class="editable-input hidden inline w-auto ml-1 font-mono"></li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800 mb-2">📋 Pré-Condições</h3>
+                        <ol id="preconditions-list" class="list-inside text-slate-600 space-y-1" data-editable-list-id="preconditions-list">
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">1.</span>
+                                <span data-editable-id="precon-item-1" class="editable-text flex-grow">O ambiente de teste (`Homologação`) deve estar acessível e funcional.</span>
+                                <input type="text" id="input-precon-item-1" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">2.</span>
+                                <span data-editable-id="precon-item-2" class="editable-text flex-grow">A página de login do sistema deve estar operacional.</span>
+                                <input type="text" id="input-precon-item-2" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">3.</span>
+                                <span data-editable-id="precon-item-3" class="editable-text flex-grow">Deve existir um usuário com perfil de `Administrador` ativo no sistema.</span>
+                                <input type="text" id="input-precon-item-3" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                        </ol>
+                    </div>
+                    
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-800 mb-2">🚶 Passos para Execução</h3>
+                        <ol id="steps-list" class="list-inside text-slate-600 space-y-2" data-editable-list-id="steps-list">
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">1.</span>
+                                <span data-editable-id="step-item-1" class="editable-text flex-grow">Acessar a URL da página de login do sistema.</span>
+                                <input type="text" id="input-step-item-1" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">2.</span>
+                                <span data-editable-id="step-item-2" class="editable-text flex-grow">Inserir as credenciais válidas do usuário `Administrador`.</span>
+                                <input type="text" id="input-step-item-2" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">3.</span>
+                                <span data-editable-id="step-item-3" class="editable-text flex-grow">Clicar no botão "Entrar" para efetuar o login.</span>
+                                <input type="text" id="input-step-item-3" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">4.</span>
+                                <span data-editable-id="step-item-4" class="editable-text flex-grow">Após o login, navegar até o menu "Usuários".</span>
+                                <input type="text" id="input-step-item-4" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">5.</span>
+                                <span data-editable-id="step-item-5" class="editable-text flex-grow">Na tela de "Usuários", inspecionar visualmente a interface, procurando pelo botão "Cadastrar novo usuário".</span>
+                                <input type="text" id="input-step-item-5" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="bg-white rounded-xl shadow-md p-6">
+                 <div class="intro-section mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">Resultados e Análise</h2>
+                </div>
+                <div class="space-y-4 mb-6">
+                    <div class="editable-container">
+                        <h4 class="font-semibold text-slate-800">Resultado Esperado:</h4>
+                        <p data-editable-id="expected-result" class="editable-text">O botão "Cadastrar novo usuário" **não** deve estar presente. A interface deve carregar corretamente.</p>
+                        <textarea id="input-expected-result" class="editable-textarea hidden"></textarea>
+                    </div>
+                    <div class="editable-container">
+                        <h4 class="font-semibold text-slate-800">Resultado Real:</h4>
+                        <p data-editable-id="actual-result" class="editable-text">O botão "Cadastrar novo usuário" não foi encontrado na tela de "Usuários". A página carregou sem erros e as demais funcionalidades de listagem estavam operacionais.</p>
+                        <textarea id="input-actual-result" class="editable-textarea hidden"></textarea>
+                    </div>
+                </div>
+                <div id="statusDisplayBar" class="p-3 rounded-lg text-white font-semibold text-center text-lg">
+                    </div>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-md p-6">
+                <h3 class="text-2xl font-bold text-slate-800 mb-6">Observações e Evidências</h3>
+                 <div class="intro-section mb-6">
+                 </div>
+                 <div class="space-y-6">
+                     <div>
+                        <h4 class="font-bold text-lg text-slate-800 mb-2">💡 Observações</h4>
+                        <ul id="observations-list" class="list-inside text-slate-600 space-y-1" data-editable-list-id="observations-list">
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">1.</span>
+                                <span data-editable-id="obs-item-1" class="editable-text flex-grow">A remoção do botão está em conformidade com a especificação.</span>
+                                <input type="text" id="input-obs-item-1" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">2.</span>
+                                <span data-editable-id="obs-item-2" class="editable-text flex-grow">A funcionalidade de listagem e gerenciamento dos usuários existentes permanece operacional.</span>
+                                <input type="text" id="input-obs-item-2" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                            <li class="editable-container flex items-center">
+                                <span class="list-item-number">3.</span>
+                                <span data-editable-id="obs-item-3" class="editable-text flex-grow">Recomenda-se verificar se a documentação do usuário foi atualizada para refletir a mudança.</span>
+                                <input type="text" id="input-obs-item-3" class="editable-input hidden flex-grow">
+                                <span class="list-item-controls hidden"></span>
+                            </li>
+                        </ul>
+                    </div>
+                     <div>
+                        <h4 class="font-bold text-lg text-slate-800 mb-2">📎 Evidências</h4>
+                        <div class="flex flex-wrap gap-3 mt-2">
+                             <button id="screenshotButton" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                                <span role="img" aria-label="screenshot">📷</span>
+                                Screenshot
+                             </button>
+                             <button id="videoButton" class="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">
+                                <span role="img" aria-label="video">🎥</span>
+                                Vídeo
+                             </button>
+                        </div>
+                        <div id="screenshotEvidenceArea" class="mt-4 hidden">
+                            <input type="file" id="imageUploadInput" class="hidden" accept="image/*">
+                             <div class="evidence-item-container w-full max-w-lg mx-auto">
+                                <img id="screenshotPreview" src="#" alt="Pré-visualização do Screenshot" class="hidden rounded-lg shadow-md border border-slate-300">
+                                <button id="removeScreenshotBtn" class="evidence-remove-btn hidden" title="Remover Screenshot">✖</button>
+                            </div>
+                            <p id="screenshotPlaceholder" class="text-slate-500 text-center p-4 border-2 border-dashed border-slate-300 rounded-lg">Nenhuma imagem selecionada.</p>
+                        </div>
+                        <div id="videoEvidenceArea" class="mt-4 hidden">
+                            <div class="flex items-center gap-2">
+                                <input type="text" id="videoLinkInput" class="editable-input flex-grow" placeholder="Cole o link do vídeo">
+                            </div>
+                            <div class="evidence-item-container mt-2 w-full max-w-lg mx-auto">
+                                <div id="videoPreviewContainer" class="bg-slate-100 rounded-lg flex items-center justify-center text-slate-500 border border-slate-300">
+                                    <p id="videoPlaceholderText">Nenhum link de vídeo inserido.</p>
+                                </div>
+                                <button id="removeVideoLinkBtn" class="evidence-remove-btn hidden" title="Remover Link do Vídeo">✖</button>
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const { jsPDF } = window.jspdf;
+            
+            const toggleEditButton = document.getElementById('toggleEditButton');
+            const savePdfButton = document.getElementById('savePdfButton');
+            let isEditing = false;
+            const editableFieldElements = document.querySelectorAll('[data-editable-id]'); 
+
+            const selectTestStatus = document.getElementById('select-test-status');
+            const displayTestStatusSpan = document.getElementById('displayTestStatusSpan');
+            const statusDisplayBar = document.getElementById('statusDisplayBar');
+            const selectTestPriority = document.getElementById('select-test-priority');
+            const displayTestPrioritySpan = document.getElementById('displayTestPrioritySpan');
+
+
+            const screenshotButton = document.getElementById('screenshotButton');
+            const videoButton = document.getElementById('videoButton');
+            const screenshotEvidenceArea = document.getElementById('screenshotEvidenceArea');
+            const imageUploadInput = document.getElementById('imageUploadInput');
+            const screenshotPreview = document.getElementById('screenshotPreview');
+            const screenshotPlaceholder = document.getElementById('screenshotPlaceholder');
+            const removeScreenshotBtn = document.getElementById('removeScreenshotBtn');
+            const videoEvidenceArea = document.getElementById('videoEvidenceArea');
+            const videoLinkInput = document.getElementById('videoLinkInput');
+            const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+            const videoPlaceholderText = document.getElementById('videoPlaceholderText'); 
+            const removeVideoLinkBtn = document.getElementById('removeVideoLinkBtn');
+
+
+            let listItemCounter = {
+                preconditions: document.getElementById('preconditions-list').children.length,
+                steps: document.getElementById('steps-list').children.length,
+                observations: document.getElementById('observations-list').children.length
+            };
+
+            const statusConfig = {
+                APROVADO: { textClass: 'text-emerald-600', bgLabelClass: 'bg-emerald-100', textLabelClass: 'text-emerald-800', statusBarClass: 'bg-emerald-500', text: 'APROVADO' },
+                REPROVADO: { textClass: 'text-red-600', bgLabelClass: 'bg-red-100', textLabelClass: 'text-red-800', statusBarClass: 'bg-red-500', text: 'REPROVADO' },
+                BLOQUEADO: { textClass: 'text-amber-600', bgLabelClass: 'bg-amber-100', textLabelClass: 'text-amber-800', statusBarClass: 'bg-amber-500', text: 'BLOQUEADO' }
+            };
+
+            const priorityConfig = {
+                Baixa: { bgLabelClass: 'bg-sky-100', textLabelClass: 'text-sky-800' },
+                Normal: { bgLabelClass: 'bg-blue-100', textLabelClass: 'text-blue-800' },
+                Alta: { bgLabelClass: 'bg-amber-100', textLabelClass: 'text-amber-800' }
+            };
+
+            function updateStatusVisuals(selectedValue) {
+                const config = statusConfig[selectedValue] || statusConfig.APROVADO;
+                displayTestStatusSpan.textContent = config.text; 
+                displayTestStatusSpan.className = `value-display-span text-sm font-semibold px-3 py-1 rounded-full ${config.bgLabelClass} ${config.textLabelClass}`;
+                selectTestStatus.className = `editable-select font-bold text-base w-full ${isEditing ? '' : 'hidden'} ${config.textClass}`;
+                
+                if (statusDisplayBar) {
+                    statusDisplayBar.textContent = config.text;
+                    statusDisplayBar.className = `p-3 rounded-lg text-white font-semibold text-center text-lg ${config.statusBarClass}`;
+                }
+            }
+
+            function updatePriorityVisuals(selectedValue) {
+                const config = priorityConfig[selectedValue] || priorityConfig.Normal;
+                displayTestPrioritySpan.textContent = selectedValue; 
+                displayTestPrioritySpan.className = `value-display-span text-sm font-semibold px-3 py-1 rounded-full ${config.bgLabelClass} ${config.textLabelClass}`;
+                selectTestPriority.className = `editable-select w-full ${isEditing ? '' : 'hidden'}`;
+            }
+
+            selectTestStatus.addEventListener('change', (event) => {
+                updateStatusVisuals(event.target.value);
+                displayTestStatusSpan.dataset.currentValue = event.target.value;
+            });
+            selectTestPriority.addEventListener('change', (event) => {
+                updatePriorityVisuals(event.target.value);
+                displayTestPrioritySpan.dataset.currentValue = event.target.value;
+            });
+            
+            selectTestPriority.value = "Normal"; 
+            displayTestStatusSpan.dataset.currentValue = selectTestStatus.value;
+            displayTestPrioritySpan.dataset.currentValue = selectTestPriority.value;
+            updateStatusVisuals(selectTestStatus.value); 
+            updatePriorityVisuals(selectTestPriority.value);
+
+
+            function updateListNumbering(listElement) {
+                const items = listElement.querySelectorAll('li');
+                items.forEach((item, index) => {
+                    const numberSpan = item.querySelector('.list-item-number');
+                    if (numberSpan) {
+                        numberSpan.textContent = `${index + 1}.`;
+                    }
+                });
+            }
+
+            function createListItemControls(liElement, listType) {
+                const controlsContainer = liElement.querySelector('.list-item-controls');
+                if (!controlsContainer) return;
+
+                controlsContainer.innerHTML = ''; 
+
+                const addButton = document.createElement('button');
+                addButton.type = 'button';
+                addButton.textContent = '+';
+                addButton.title = 'Adicionar item abaixo';
+                addButton.classList.add('add-item-btn');
+                addButton.addEventListener('click', () => addListItem(liElement, listType));
+                
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.textContent = '−'; 
+                removeButton.title = 'Remover este item';
+                removeButton.classList.add('remove-item-btn');
+                removeButton.addEventListener('click', () => removeListItem(liElement, listType));
+
+                controlsContainer.appendChild(addButton);
+                controlsContainer.appendChild(removeButton);
+                
+                updateRemoveButtonState(liElement.parentElement);
+            }
+            
+            function updateRemoveButtonState(listElement) {
+                const items = listElement.querySelectorAll('li');
+                items.forEach((item) => {
+                    const removeBtn = item.querySelector('.remove-item-btn');
+                    if (removeBtn) {
+                        removeBtn.disabled = items.length <= 1;
+                    }
+                });
+            }
+
+            function addListItem(currentItemLi, listType) {
+                listItemCounter[listType]++;
+                const newListIdSuffix = `${listType.slice(0,4)}-item-${listItemCounter[listType]}`;
+
+                const newLi = document.createElement('li');
+                newLi.className = 'editable-container flex items-center mt-1';
+
+                const newNumberSpan = document.createElement('span');
+                newNumberSpan.className = 'list-item-number'; 
+
+                const newSpan = document.createElement('span');
+                newSpan.dataset.editableId = newListIdSuffix;
+                newSpan.className = 'editable-text flex-grow hidden'; 
+                newSpan.textContent = 'Novo item';
+
+                const newInput = document.createElement('input');
+                newInput.type = 'text';
+                newInput.id = `input-${newListIdSuffix}`;
+                newInput.className = 'editable-input flex-grow py-0.5 px-1 text-sm'; 
+                newInput.value = 'Novo item';
+
+                const newControls = document.createElement('span');
+                newControls.className = 'list-item-controls'; 
+
+                newLi.appendChild(newNumberSpan);
+                newLi.appendChild(newSpan);
+                newLi.appendChild(newInput);
+                newLi.appendChild(newControls);
+                
+                currentItemLi.parentElement.insertBefore(newLi, currentItemLi.nextSibling);
+                updateListNumbering(currentItemLi.parentElement);
+                createListItemControls(newLi, listType); 
+                
+                Array.from(currentItemLi.parentElement.children).forEach(item => {
+                    if (item.querySelector('.list-item-controls')) {
+                         createListItemControls(item, listType);
+                    }
+                });
+                newInput.focus();
+                newInput.select();
+            }
+
+            function removeListItem(itemLi, listType) {
+                const listElement = itemLi.parentElement;
+                if (listElement.children.length > 1) {
+                    itemLi.remove();
+                    updateListNumbering(listElement);
+                    updateRemoveButtonState(listElement);
+                }
+            }
+            
+            function initializeListControlsAndNumbering() {
+                document.querySelectorAll('[data-editable-list-id]').forEach(list => {
+                    const listType = list.id.split('-')[0]; 
+                    updateListNumbering(list);
+                    Array.from(list.children).forEach(li => {
+                        const controlsContainer = li.querySelector('.list-item-controls');
+                        if (controlsContainer) { 
+                           createListItemControls(li, listType);
+                        }
+                    });
+                });
+            }
+            initializeListControlsAndNumbering();
+
+            function toggleOtherElementsVisibility(editingMode) {
+                if (editingMode) {
+                    displayTestStatusSpan.classList.add('hidden');
+                    selectTestStatus.classList.remove('hidden');
+                    selectTestStatus.value = displayTestStatusSpan.dataset.currentValue || 'APROVADO';
+
+                    displayTestPrioritySpan.classList.add('hidden');
+                    selectTestPriority.classList.remove('hidden');
+                    selectTestPriority.value = displayTestPrioritySpan.dataset.currentValue || 'Normal';
+                } else {
+                    const statusConfigVal = statusConfig[selectTestStatus.value] || statusConfig.APROVADO;
+                    displayTestStatusSpan.textContent = statusConfigVal.text;
+                    displayTestStatusSpan.dataset.currentValue = selectTestStatus.value;
+                    updateStatusVisuals(selectTestStatus.value); 
+                    displayTestStatusSpan.classList.remove('hidden');
+                    selectTestStatus.classList.add('hidden');
+
+                    const priorityValue = selectTestPriority.value;
+                    displayTestPrioritySpan.textContent = priorityValue;
+                    displayTestPrioritySpan.dataset.currentValue = priorityValue;
+                    updatePriorityVisuals(priorityValue); 
+                    displayTestPrioritySpan.classList.remove('hidden');
+                    selectTestPriority.classList.add('hidden');
+                }
+
+                 editableFieldElements.forEach(element => { 
+                    const editableId = element.dataset.editableId;
+                     if (element.id === 'displayTestStatusSpan' || element.id === 'displayTestPrioritySpan') return;
+                    
+                    const parentLi = element.closest('li.editable-container');
+
+                    if (parentLi && parentLi.parentElement && parentLi.parentElement.dataset.editableListId) {
+                        const textElementInLi = element; 
+                        const inputElementInLi = parentLi.querySelector(`#input-${editableId}`); 
+                        const controlsElementInLi = parentLi.querySelector('.list-item-controls');
+
+                        if (textElementInLi && inputElementInLi) {
+                            if (editingMode) {
+                                inputElementInLi.value = textElementInLi.textContent.trim();
+                                textElementInLi.classList.add('hidden');
+                                inputElementInLi.classList.remove('hidden');
+                                if (controlsElementInLi) controlsElementInLi.classList.remove('hidden');
+                            } else {
+                                textElementInLi.textContent = inputElementInLi.value;
+                                inputElementInLi.classList.add('hidden');
+                                textElementInLi.classList.remove('hidden');
+                                if (controlsElementInLi) controlsElementInLi.classList.add('hidden');
+                            }
+                        }
+                    } else {
+                        const textElement = element; 
+                        const inputElement = document.getElementById(`input-${editableId}`);
+                        if (textElement && inputElement && textElement.classList.contains('editable-text')) {
+                            if (editingMode) {
+                                if (inputElement.tagName === 'TEXTAREA') {
+                                    inputElement.value = textElement.innerHTML.replace(/<br\s*\/?>/gi, "\n").trim();
+                                } else {
+                                    inputElement.value = textElement.textContent.trim();
+                                }
+                                textElement.classList.add('hidden');
+                                inputElement.classList.remove('hidden');
+                            } else {
+                                if (inputElement.tagName === 'TEXTAREA') {
+                                    textElement.innerHTML = inputElement.value.replace(/\n/g, "<br>");
+                                } else {
+                                    textElement.textContent = inputElement.value;
+                                }
+                                inputElement.classList.add('hidden');
+                                textElement.classList.remove('hidden');
+                            }
+                        }
+                    }
+                });
+            }
+
+
+            toggleEditButton.addEventListener('click', () => {
+                isEditing = !isEditing;
+                toggleEditButton.textContent = isEditing ? 'Salvar Dados' : 'Editar Dados';
+                savePdfButton.disabled = isEditing; // Desabilitar/Habilitar botão PDF
+                toggleEditButton.classList.toggle('bg-sky-600', !isEditing);
+                toggleEditButton.classList.toggle('hover:bg-sky-700', !isEditing);
+                toggleEditButton.classList.toggle('bg-emerald-600', isEditing);
+                toggleEditButton.classList.toggle('hover:bg-emerald-700', isEditing);
+                toggleOtherElementsVisibility(isEditing);
+            });
+
+            screenshotButton.addEventListener('click', () => {
+                videoEvidenceArea.classList.add('hidden'); 
+                removeVideoLinkBtn.classList.add('hidden');
+                screenshotEvidenceArea.classList.toggle('hidden');
+                if (!screenshotEvidenceArea.classList.contains('hidden')) {
+                    imageUploadInput.value = null; 
+                    imageUploadInput.click(); 
+                    if (!screenshotPreview.src || screenshotPreview.src.endsWith('#') || screenshotPreview.classList.contains('hidden')) {
+                        screenshotPlaceholder.classList.remove('hidden');
+                        screenshotPreview.classList.add('hidden');
+                        removeScreenshotBtn.classList.add('hidden');
+                    } else {
+                         removeScreenshotBtn.classList.remove('hidden');
+                    }
+                } else {
+                     removeScreenshotBtn.classList.add('hidden');
+                }
+            });
+
+            imageUploadInput.addEventListener('change', function(event) {
+                if (event.target.files && event.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        screenshotPreview.src = e.target.result;
+                        screenshotPreview.classList.remove('hidden');
+                        screenshotPlaceholder.classList.add('hidden');
+                        removeScreenshotBtn.classList.remove('hidden');
+                    }
+                    reader.readAsDataURL(event.target.files[0]);
+                } else {
+                    screenshotPreview.src = "#";
+                    screenshotPreview.classList.add('hidden');
+                    screenshotPlaceholder.classList.remove('hidden');
+                    removeScreenshotBtn.classList.add('hidden');
+                }
+            });
+            
+            removeScreenshotBtn.addEventListener('click', () => {
+                screenshotPreview.src = "#";
+                screenshotPreview.classList.add('hidden');
+                screenshotPlaceholder.classList.remove('hidden');
+                removeScreenshotBtn.classList.add('hidden');
+                imageUploadInput.value = null; 
+            });
+
+
+            videoButton.addEventListener('click', () => {
+                screenshotEvidenceArea.classList.add('hidden');
+                removeScreenshotBtn.classList.add('hidden');
+                videoEvidenceArea.classList.toggle('hidden');
+                if (!videoEvidenceArea.classList.contains('hidden')) {
+                    videoLinkInput.focus();
+                    if (videoLinkInput.value.trim()) {
+                        removeVideoLinkBtn.classList.remove('hidden');
+                    } else {
+                        removeVideoLinkBtn.classList.add('hidden');
+                    }
+                } else {
+                    removeVideoLinkBtn.classList.add('hidden');
+                }
+            });
+
+            videoLinkInput.addEventListener('input', function(event) {
+                const link = event.target.value.trim();
+                videoPreviewContainer.innerHTML = ''; 
+
+                if (link) {
+                    const p = document.createElement('p');
+                    p.className = 'text-slate-500 p-4 text-center break-all';
+                    p.textContent = `Link: `;
+                    const a = document.createElement('a');
+                    a.href = link;
+                    a.textContent = link;
+                    a.target = "_blank";
+                    a.rel = "noopener noreferrer";
+                    a.className = "text-sky-600 hover:text-sky-700 underline";
+                    p.appendChild(a);
+                    videoPreviewContainer.appendChild(p);
+                    removeVideoLinkBtn.classList.remove('hidden');
+                } else {
+                     videoPreviewContainer.innerHTML = `<p id="videoPlaceholderText" class="text-slate-500 p-4">Nenhum link de vídeo inserido.</p>`;
+                     removeVideoLinkBtn.classList.add('hidden');
+                }
+            });
+            videoPreviewContainer.innerHTML = `<p id="videoPlaceholderText" class="text-slate-500 p-4">Nenhum link de vídeo inserido.</p>`;
+            
+            removeVideoLinkBtn.addEventListener('click', () => {
+                videoLinkInput.value = '';
+                videoPreviewContainer.innerHTML = `<p id="videoPlaceholderText" class="text-slate-500 p-4">Nenhum link de vídeo inserido.</p>`;
+                removeVideoLinkBtn.classList.add('hidden');
+            });
+
+            
+            function formatFilename(title) {
+                if (!title) return 'relatorioDeTeste';
+                let formatted = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                formatted = formatted.replace(/[^a-zA-Z0-9\s]/g, '');
+                const words = formatted.toLowerCase().split(/\s+/).filter(word => word.length > 0);
+                if (words.length === 0) return 'relatorioDeTeste';
+                return words.map((word, index) => {
+                    if (index === 0) return word;
+                    return word.charAt(0).toUpperCase() + word.slice(1);
+                }).join('');
+            }
+
+            savePdfButton.addEventListener('click', async () => {
+                if (isEditing) { 
+                    isEditing = false;
+                    toggleEditButton.textContent = 'Editar Dados';
+                    toggleEditButton.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+                    toggleEditButton.classList.add('bg-sky-600', 'hover:bg-sky-700');
+                    savePdfButton.disabled = false; // Habilitar botão PDF ao salvar dados
+                    toggleOtherElementsVisibility(false); 
+                }
+
+                const originalButtonText = savePdfButton.textContent;
+                savePdfButton.textContent = 'Gerando PDF...';
+                savePdfButton.disabled = true;
+
+                const reportContainer = document.getElementById('reportContainer');
+                const mainTitleElement = document.querySelector('[data-editable-id="main-title"]');
+                const reportTitleText = mainTitleElement ? mainTitleElement.textContent.trim() : 'Relatorio De Teste';
+                const filename = formatFilename(reportTitleText) + '.pdf';
+
+
+                try {
+                    await new Promise(resolve => setTimeout(resolve, 250)); 
+
+                    const canvas = await html2canvas(reportContainer, { 
+                        scale: 2, useCORS: true, logging: false,
+                        onclone: (doc) => { 
+                            doc.body.style.backgroundColor = '#e5e7eb'; 
+
+                            const idsToHideInPdf = ['toggleEditButton', 'savePdfButton', 'screenshotButton', 'videoButton', 'imageUploadInput', 'videoLinkInput', 'removeScreenshotBtn', 'removeVideoLinkBtn'];
+                            doc.querySelectorAll('.list-item-controls').forEach(el => el.style.display = 'none'); 
+                            idsToHideInPdf.forEach(id => {
+                                const el = doc.getElementById(id);
+                                if (el) el.style.display = 'none';
+                            });
+                            
+                            doc.querySelectorAll('#infoTable thead th').forEach(th => {
+                                th.style.textAlign = 'center';
+                                th.style.padding = '8px';
+                            });
+                             doc.querySelectorAll('#infoTable tbody td').forEach(td => {
+                                td.style.textAlign = 'center';
+                                td.style.verticalAlign = 'middle';
+                                td.style.padding = '12px 8px'; 
+                            });
+                            
+                            doc.querySelectorAll('#infoTable span[data-editable-id]').forEach(span => {
+                                span.style.display = 'block';
+                                span.style.textAlign = 'center';
+                            });
+
+                            const statusSelectClone = doc.getElementById('select-test-status');
+                            const statusSpanClone = doc.getElementById('displayTestStatusSpan');
+                            if(statusSelectClone && statusSpanClone) {
+                                statusSelectClone.style.display = 'none';
+                                statusSpanClone.style.display = 'inline-block'; 
+                                statusSpanClone.style.textAlign = 'center';
+                            }
+
+                            const prioritySelectClone = doc.getElementById('select-test-priority');
+                            const prioritySpanClone = doc.getElementById('displayTestPrioritySpan');
+                             if(prioritySelectClone && prioritySpanClone) {
+                                prioritySelectClone.style.display = 'none';
+                                prioritySpanClone.style.display = 'inline-block';
+                                prioritySpanClone.style.textAlign = 'center';
+                            }
+                            
+                            const statusDisplayBarClone = doc.getElementById('statusDisplayBar');
+                            if (statusDisplayBarClone && selectTestStatus) {
+                                const currentStatusValue = selectTestStatus.value;
+                                const config = statusConfig[currentStatusValue] || statusConfig.APROVADO;
+                                
+                                statusDisplayBarClone.className = `rounded-lg text-white font-semibold text-lg ${config.statusBarClass}`; 
+                                statusDisplayBarClone.style.paddingTop = '10px'; 
+                                statusDisplayBarClone.style.paddingBottom = '14px'; 
+                                statusDisplayBarClone.style.paddingLeft = '0.75rem'; 
+                                statusDisplayBarClone.style.paddingRight = '0.75rem'; 
+                                statusDisplayBarClone.style.display = 'flex';
+                                statusDisplayBarClone.style.alignItems = 'center'; 
+                                statusDisplayBarClone.style.justifyContent = 'center';
+                                statusDisplayBarClone.style.textAlign = 'center'; 
+                                statusDisplayBarClone.style.height = '48px'; 
+                                statusDisplayBarClone.textContent = config.text;
+                            }
+
+
+                            const screenshotPreviewElClone = doc.getElementById('screenshotPreview');
+                            if (screenshotPreviewElClone && (!screenshotPreviewElClone.getAttribute('src') || screenshotPreviewElClone.getAttribute('src') === '#' || screenshotPreviewElClone.classList.contains('hidden'))) {
+                                const area = doc.getElementById('screenshotEvidenceArea');
+                                if(area) area.style.display = 'none';
+                            } else if (screenshotPreviewElClone) { 
+                                const area = doc.getElementById('screenshotEvidenceArea');
+                                if(area) area.style.display = 'block';
+                            }
+
+                            const videoEvidenceAreaClone = doc.getElementById('videoEvidenceArea');
+                            if (videoEvidenceAreaClone) {
+                                if (!videoLinkInput.value.trim()) { 
+                                    videoEvidenceAreaClone.style.display = 'none';
+                                } else {
+                                     videoEvidenceAreaClone.style.display = 'block'; 
+                                }
+                            }
+                        }
+                    });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF({ orientation: 'p', unit: 'px', format: [canvas.width, canvas.height] });
+                    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                    pdf.save(filename);
+                } catch (error) {
+                    console.error("Erro ao gerar PDF:", error);
+                    alert("Ocorreu um erro ao gerar o PDF. Verifique o console para mais detalhes.");
+                } finally {
+                    savePdfButton.textContent = originalButtonText;
+                    savePdfButton.disabled = false; // Reabilitar após a tentativa de gerar PDF
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
