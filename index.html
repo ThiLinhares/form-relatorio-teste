@@ -408,7 +408,7 @@
 
             function updateStatusVisuals(selectedValue) {
                 const config = statusConfig[selectedValue] || statusConfig.APROVADO;
-                displayTestStatusSpan.textContent = config.text; 
+                displayTestStatusSpan.textContent = selectTestStatus.options[selectTestStatus.selectedIndex].text;
                 displayTestStatusSpan.className = `value-display-span text-sm font-semibold px-3 py-1 rounded-full ${config.bgLabelClass} ${config.textLabelClass}`;
                 selectTestStatus.className = `editable-select font-bold text-base w-full ${isEditing ? '' : 'hidden'} ${config.textClass}`;
                 
@@ -563,7 +563,7 @@
                     selectTestPriority.value = displayTestPrioritySpan.dataset.currentValue || 'Normal';
                 } else {
                     const statusConfigVal = statusConfig[selectTestStatus.value] || statusConfig.APROVADO;
-                    displayTestStatusSpan.textContent = statusConfigVal.text;
+                    displayTestStatusSpan.textContent = selectTestStatus.options[selectTestStatus.selectedIndex].text;
                     displayTestStatusSpan.dataset.currentValue = selectTestStatus.value;
                     updateStatusVisuals(selectTestStatus.value); 
                     displayTestStatusSpan.classList.remove('hidden');
@@ -577,9 +577,9 @@
                     selectTestPriority.classList.add('hidden');
                 }
 
-                 editableFieldElements.forEach(element => { 
+                 document.querySelectorAll('[data-editable-id]').forEach(element => { 
                     const editableId = element.dataset.editableId;
-                     if (element.id === 'displayTestStatusSpan' || element.id === 'displayTestPrioritySpan') return;
+                     if (element.id === 'displayTestStatusSpan' || element.id === 'displayTestPrioritySpan' || element.dataset.valueId) return;
                     
                     const parentLi = element.closest('li.editable-container');
 
@@ -631,7 +631,7 @@
             toggleEditButton.addEventListener('click', () => {
                 isEditing = !isEditing;
                 toggleEditButton.textContent = isEditing ? 'Salvar Dados' : 'Editar Dados';
-                savePdfButton.disabled = isEditing; // Desabilitar/Habilitar botão PDF
+                savePdfButton.disabled = isEditing; 
                 toggleEditButton.classList.toggle('bg-sky-600', !isEditing);
                 toggleEditButton.classList.toggle('hover:bg-sky-700', !isEditing);
                 toggleEditButton.classList.toggle('bg-emerald-600', isEditing);
@@ -750,7 +750,7 @@
                     toggleEditButton.textContent = 'Editar Dados';
                     toggleEditButton.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
                     toggleEditButton.classList.add('bg-sky-600', 'hover:bg-sky-700');
-                    savePdfButton.disabled = false; // Habilitar botão PDF ao salvar dados
+                    savePdfButton.disabled = false;
                     toggleOtherElementsVisibility(false); 
                 }
 
@@ -857,7 +857,7 @@
                     alert("Ocorreu um erro ao gerar o PDF. Verifique o console para mais detalhes.");
                 } finally {
                     savePdfButton.textContent = originalButtonText;
-                    savePdfButton.disabled = false; // Reabilitar após a tentativa de gerar PDF
+                    savePdfButton.disabled = false;
                 }
             });
         });
